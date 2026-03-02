@@ -15,6 +15,7 @@ class StandardizeResult:
     smiles_std: Optional[str]
     reason: Optional[str] = None
 
+
 def standardize_smiles(
     smiles: object,
     *,
@@ -47,7 +48,9 @@ def standardize_smiles(
         # Here it is also an option to use rdMolStandardize.LargestFragmentChooser() if there are multiple Smiles and also for the SaltRemover to select the SMARTS patterns
         remover = SaltRemover.SaltRemover()
         mol = remover.StripMol(mol, dontRemoveEverything=True)
-        if mol is None or mol.GetNumAtoms() == 0: # Cover case if everything was still removed
+        if (
+            mol is None or mol.GetNumAtoms() == 0
+        ):  # Cover case if everything was still removed
             return StandardizeResult(None, "empty_after_desalt")
 
         # Here we now come to the case that we may have a mix of protonated/salt molecules and non protonated molecules.
@@ -57,7 +60,9 @@ def standardize_smiles(
         # Here I was thinking if it should be tautomer --> protonation or protonation --> tautomer
         if protonate:
             uncharge = False  # protonation and uncharging are contradictory in practice
-            base_smiles = Chem.MolToSmiles(mol, canonical=True, isomericSmiles=keep_isomeric)
+            base_smiles = Chem.MolToSmiles(
+                mol, canonical=True, isomericSmiles=keep_isomeric
+            )
 
             # Here there are multiple settings, like the precision, which increases the amount of correct, but also incorrect predictions
             # Here I would keep defaults, due to the paper suggestion
@@ -66,7 +71,7 @@ def standardize_smiles(
                 base_smiles,
                 ph_min=ph,
                 ph_max=ph,
-                max_variants=1, # Here I selected 1 to not get multiple variants for the same molecule. problem is that if it has multiple variants it may not give here the same variant
+                max_variants=1,  # Here I selected 1 to not get multiple variants for the same molecule. problem is that if it has multiple variants it may not give here the same variant
             )
             if not variants:
                 return StandardizeResult(None, "protonate_no_variants")
