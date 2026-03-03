@@ -10,4 +10,6 @@ dependencies:
       - mordred>=1.2.0
       - torch
       - chemprop>=2.2.0
+      - auto-sklearn2
+      - scikit-learn
       - pytest>=8.0
