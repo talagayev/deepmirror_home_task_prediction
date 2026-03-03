@@ -1,7 +1,7 @@
 # tests/test_rdkit_path.py
 import numpy as np
 
-from automl_molops.featurize.rdkit_path import (
+from deepmirror_predict.features.rdkit_path import (
     RDKitPathFPConfig,
     rdkit_path_bits_from_smiles,
     rdkit_path_bits_feature_names,
