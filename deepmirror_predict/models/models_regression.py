@@ -15,25 +15,44 @@ from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 
+# Requires: deepmirror_predict/models/chemprop_regressor.py (ChempropConfig, ChempropRegressor)
+from deepmirror_predict.models.chemprop_regression import ChempropConfig, ChempropRegressor
 
-ModelName = Literal["rf", "svm", "xgb", "lgbm"]
+
+ModelName = Literal["rf", "svm", "xgb", "lgbm", "chemprop"]
 
 
 @dataclass(frozen=True)
 class TrainConfig:
     model: ModelName
     random_state: int = 0
-    n_jobs: int = -1  # used by RF, LGBM & XGB
+    n_jobs: int = -1  # used by RF, LGBM & XGB (ignored by Chemprop)
     # preprocessing
     impute: Optional[str] = None  # None | "median"
     scale: bool = False           # For SVM
 
 
 def _has_nans(X: np.ndarray) -> bool:
+    """
+    NaN detection that is safe for both numeric matrices and object arrays (e.g., SMILES).
+    """
+    X = np.asarray(X)
+    if not np.issubdtype(X.dtype, np.number):
+        return False
     return bool(np.isnan(X).any())
 
 
 def default_train_config(model: ModelName, X: np.ndarray) -> TrainConfig:
+    """
+    Default preprocessing choices per model.
+
+    - chemprop: X is SMILES (object), no imputation/scaling in sklearn pipeline
+    - svm: scaling recommended, impute if needed
+    - others: impute if needed, no scaling by default
+    """
+    if model == "chemprop":
+        return TrainConfig(model=model, impute=None, scale=False)
+
     need_impute = _has_nans(X)
 
     if model == "svm":
@@ -101,6 +120,19 @@ def _make_estimator(
         defaults.update(params)
         return LGBMRegressor(**defaults)
 
+    if model == "chemprop":
+        # Allow overriding random_state via params for consistency with other estimators
+        rs = int(params.pop("random_state", random_state))
+        params.pop("n_jobs", None)  # not used by ChempropRegressor
+
+        cfg = params.pop("cfg", None)
+        if cfg is None:
+            cfg = ChempropConfig(**params)
+        elif not isinstance(cfg, ChempropConfig):
+            raise TypeError(f"chemprop param 'cfg' must be ChempropConfig, got {type(cfg)}")
+
+        return ChempropRegressor(cfg=cfg, random_state=rs)
+
     raise ValueError(f"Unknown model: {model}")
 
 
@@ -132,13 +164,36 @@ def fit_predict(
     model: ModelName,
     params: Optional[Dict[str, Any]] = None,
     cfg: Optional[TrainConfig] = None,
+    y_valid: Optional[np.ndarray] = None,  # required for chemprop (eval_set)
 ) -> Tuple[np.ndarray, Any]:
-    X_train = np.asarray(X_train, dtype=np.float32)
-    X_valid = np.asarray(X_valid, dtype=np.float32)
+    """
+    Fit model on (X_train, y_train) and predict on X_valid.
+
+    - For numeric models: X_* are float32 feature matrices.
+    - For chemprop: X_* are SMILES arrays/lists (object dtype).
+      Chemprop requires y_valid to be provided so it can early-stop/checkpoint on validation loss.
+
+    Returns: (y_pred, fitted_pipeline)
+    """
+    if model == "chemprop":
+        X_train = np.asarray(X_train, dtype=object)
+        X_valid = np.asarray(X_valid, dtype=object)
+    else:
+        X_train = np.asarray(X_train, dtype=np.float32)
+        X_valid = np.asarray(X_valid, dtype=np.float32)
+
     y_train = np.asarray(y_train, dtype=np.float32)
 
     cfg = cfg or default_train_config(model, X_train)
     pipe = build_pipeline(X_train, cfg=cfg, params=params)
-    pipe.fit(X_train, y_train)
+
+    if model == "chemprop":
+        if y_valid is None:
+            raise ValueError("fit_predict(model='chemprop') requires y_valid for eval_set.")
+        y_valid = np.asarray(y_valid, dtype=np.float32)
+        pipe.fit(X_train, y_train, model__eval_set=[(X_valid, y_valid)])
+    else:
+        pipe.fit(X_train, y_train)
+
     y_pred = pipe.predict(X_valid).astype(np.float32, copy=False)
     return y_pred, pipe
