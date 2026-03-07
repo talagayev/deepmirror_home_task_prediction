@@ -3,9 +3,9 @@ import numpy as np
 import pytest
 
 # Normal imports (no importorskip)
-import chemprop  # noqa: F401
-import lightning  # noqa: F401
-import torch  # noqa: F401
+import chemprop
+import lightning
+import torch
 
 from deepmirror_predict.models.models_regression import (
     TrainConfig,

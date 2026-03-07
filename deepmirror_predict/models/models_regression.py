@@ -17,9 +17,9 @@ from lightgbm import LGBMRegressor
 
 # Requires: deepmirror_predict/models/chemprop_regressor.py (ChempropConfig, ChempropRegressor)
 from deepmirror_predict.models.chemprop_regression import ChempropConfig, ChempropRegressor
+from deepmirror_predict.models.autogluon_regressor import AutoGluonConfig, AutoGluonRegressor
 
-
-ModelName = Literal["rf", "svm", "xgb", "lgbm", "chemprop"]
+ModelName = Literal["rf", "svm", "xgb", "lgbm", "chemprop", "autogluon"]
 
 
 @dataclass(frozen=True)
@@ -57,6 +57,9 @@ def default_train_config(model: ModelName, X: np.ndarray) -> TrainConfig:
 
     if model == "svm":
         return TrainConfig(model=model, impute="median" if need_impute else None, scale=True)
+
+    if model == "autogluon":
+        return TrainConfig(model=model, impute=None, scale=False)
 
     return TrainConfig(model=model, impute="median" if need_impute else None, scale=False)
 
@@ -133,8 +136,19 @@ def _make_estimator(
 
         return ChempropRegressor(cfg=cfg, random_state=rs)
 
-    raise ValueError(f"Unknown model: {model}")
+    if model == "autogluon":
+        rs = int(params.pop("random_state", random_state))
+        params.pop("n_jobs", None)  # AutoGluon doesn't use sklearn n_jobs here
 
+        cfg = params.pop("cfg", None)
+        if cfg is None:
+            cfg = AutoGluonConfig(**params)
+        elif not isinstance(cfg, AutoGluonConfig):
+            raise TypeError(f"autogluon param 'cfg' must be AutoGluonConfig, got {type(cfg)}")
+
+        return AutoGluonRegressor(cfg=cfg, random_state=rs)
+
+    raise ValueError(f"Unknown model: {model}")
 
 def build_pipeline(
     X: np.ndarray,
@@ -194,6 +208,13 @@ def fit_predict(
         pipe.fit(X_train, y_train, model__eval_set=[(X_valid, y_valid)])
     else:
         pipe.fit(X_train, y_train)
+
+    if model == "autogluon":
+        if y_valid is not None:
+            y_valid = np.asarray(y_valid, dtype=np.float32)
+            pipe.fit(X_train, y_train, model__eval_set=[(X_valid, y_valid)])
+        else:
+            pipe.fit(X_train, y_train)
 
     y_pred = pipe.predict(X_valid).astype(np.float32, copy=False)
     return y_pred, pipe
