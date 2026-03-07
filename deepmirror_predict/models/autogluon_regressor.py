@@ -9,7 +9,16 @@ from sklearn.base import BaseEstimator, RegressorMixin
 
 from autogluon.tabular import TabularPredictor
 
-from .metrics import rmse, mae, r2
+from .metrics import (
+    rmse,
+    mse,
+    mae,
+    r2,
+    kendall_tau,
+    kendall_tau_pvalue,
+    spearman_rho,
+    spearman_pvalue,
+)
 
 
 @dataclass(frozen=True)
