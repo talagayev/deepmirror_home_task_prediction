@@ -33,20 +33,18 @@ def _apply_preference_filter(
 
     prefer_value = _coerce_prefer_value(prefer_value)
 
-    def _filter_group(g: pd.DataFrame) -> pd.DataFrame:
+    selected_groups = []
+
+    for _, g in df.groupby(key_cols, dropna=False):
         is_preferred = g[prefer_col].eq(prefer_value)
 
         # Only filter when both preferred and non-preferred values are present
         if is_preferred.any() and (~is_preferred).any():
-            return g[is_preferred]
+            selected_groups.append(g.loc[is_preferred])
+        else:
+            selected_groups.append(g)
 
-        return g
-
-    return (
-        df.groupby(key_cols, dropna=False, group_keys=False)
-        .apply(_filter_group)
-        .reset_index(drop=True)
-    )
+    return pd.concat(selected_groups, axis=0, ignore_index=True)
 
 
 def _first_nonnull(s: pd.Series):
@@ -94,7 +92,6 @@ def deduplicate_smiles(
             prefer_value=prefer_value,
         )
 
-    # Keep metadata columns using "first non-null" per group
     rep_aggs = {
         c: (c, _first_nonnull)
         for c in keep_cols
