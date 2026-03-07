@@ -231,15 +231,20 @@ class AutoGluonRegressor(RegressorMixin, BaseEstimator):
 
     def evaluate_metrics(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
         """
-        Returns positive RMSE/MAE and standard R2, computed from predictions.
-        (This avoids AutoGluon's "higher-is-better" sign conventions.) :contentReference[oaicite:8]{index=8}
+        Returns positive RMSE/MSE/MAE, standard R2, and rank-correlation metrics
+        computed from predictions.
         """
         y = np.asarray(y, dtype=np.float32).reshape(-1)
         y_pred = self.predict(X).astype(np.float32, copy=False)
         return {
             "rmse": float(rmse(y, y_pred)),
+            "mse": float(mse(y, y_pred)),
             "mae": float(mae(y, y_pred)),
             "r2": float(r2(y, y_pred)),
+            "kendall_tau": float(kendall_tau(y, y_pred)),
+            "kendall_tau_pvalue": float(kendall_tau_pvalue(y, y_pred)),
+            "spearman_rho": float(spearman_rho(y, y_pred)),
+            "spearman_pvalue": float(spearman_pvalue(y, y_pred)),
         }
 
     def best_model_report(self, X: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
