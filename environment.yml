@@ -15,5 +15,6 @@ dependencies:
       - xgboost
       - auto-sklearn2
       - scikit-learn
+      - scipy
       - umap-learn
       - pytest>=8.0

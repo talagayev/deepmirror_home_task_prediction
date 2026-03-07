@@ -67,12 +67,33 @@ def test_autogluon_evaluate_metrics_returns_expected_keys(tmp_path):
 
     metrics = model.evaluate_metrics(X_val, y_val)
 
-    assert set(metrics.keys()) == {"rmse", "mae", "r2"}
+    assert set(metrics.keys()) == {
+        "rmse",
+        "mse",
+        "mae",
+        "r2",
+        "kendall_tau",
+        "kendall_tau_pvalue",
+        "spearman_rho",
+        "spearman_pvalue",
+    }
     assert np.isfinite(metrics["rmse"])
     assert np.isfinite(metrics["mae"])
     assert np.isfinite(metrics["r2"])
     assert metrics["rmse"] >= 0.0
     assert metrics["mae"] >= 0.0
+
+    assert np.isfinite(metrics["mse"])
+    assert np.isfinite(metrics["kendall_tau"])
+    assert np.isfinite(metrics["kendall_tau_pvalue"])
+    assert np.isfinite(metrics["spearman_rho"])
+    assert np.isfinite(metrics["spearman_pvalue"])
+    
+    assert metrics["mse"] >= 0.0
+    assert -1.0 <= metrics["kendall_tau"] <= 1.0
+    assert -1.0 <= metrics["spearman_rho"] <= 1.0
+    assert 0.0 <= metrics["kendall_tau_pvalue"] <= 1.0
+    assert 0.0 <= metrics["spearman_pvalue"] <= 1.0
 
 
 def test_autogluon_best_model_helpers_work(tmp_path):
@@ -115,7 +136,16 @@ def test_autogluon_best_model_helpers_work(tmp_path):
     assert "metrics" in report
 
     assert report["best_model"] == best_name
-    assert set(report["metrics"].keys()) == {"rmse", "mae", "r2"}
+    assert set(report["metrics"].keys()) == {
+        "rmse",
+        "mse",
+        "mae",
+        "r2",
+        "kendall_tau",
+        "kendall_tau_pvalue",
+        "spearman_rho",
+        "spearman_pvalue",
+    }
 
 
 def test_autogluon_leaderboard_returns_dataframe(tmp_path):
