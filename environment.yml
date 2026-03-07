@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.11
   - rdkit
+  - autogluon
   - pip
   - pip:
       - dimorphite-dl>=1.3.2
@@ -12,7 +13,6 @@ dependencies:
       - chemprop>=2.2.0
       - lightgbm
       - xgboost
-      - autogluon
       - auto-sklearn2
       - scikit-learn
       - umap-learn
