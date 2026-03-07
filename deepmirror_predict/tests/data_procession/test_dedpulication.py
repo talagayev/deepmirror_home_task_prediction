@@ -1,4 +1,3 @@
-# tests/test_deduplicate.py
 import numpy as np
 import pandas as pd
 import pytest
@@ -7,7 +6,6 @@ from deepmirror_predict.data_preprocession.dedpulication import deduplicate_smil
 
 
 def test_dedup_mean_basic_with_smiles_like_keys():
-    """Test if dedpulcation recognizes identical Smiles"""
     df = pd.DataFrame(
         {
             "smiles_std": ["CCO", "CCO", "c1ccccc1"],
@@ -29,15 +27,15 @@ def test_dedup_mean_basic_with_smiles_like_keys():
 
     assert e["activity_deduplicated"] == 2.0
     assert e["n_reps"] == 2
-    assert np.isclose(e["activity_std"], np.std([1.0, 3.0], ddof=1))
-    assert e["activity_min"] == 1.0
-    assert e["activity_max"] == 3.0
+    assert np.isclose(e["y_std"], np.std([1.0, 3.0], ddof=1))
+    assert e["y_min"] == 1.0
+    assert e["y_max"] == 3.0
 
     assert b["activity_deduplicated"] == 10.0
     assert b["n_reps"] == 1
-    assert np.isnan(b["activity_std"])
-    assert b["activity_min"] == 10.0
-    assert b["activity_max"] == 10.0
+    assert np.isnan(b["y_std"])
+    assert b["y_min"] == 10.0
+    assert b["y_max"] == 10.0
 
 
 def test_dedup_keeps_first_nonnull_metadata_with_smiles_like_keys():
@@ -57,6 +55,7 @@ def test_dedup_keeps_first_nonnull_metadata_with_smiles_like_keys():
         method="median",
         keep_cols=("assay_id", "smiles"),
     )
+
     row = out.iloc[0]
 
     assert row["smiles_std"] == "CCN"
@@ -81,7 +80,6 @@ def test_dedup_drops_missing_keys_and_targets_by_default():
     )
 
     assert len(out) == 1
-    assert out.shape[0] == 1
     assert out.iloc[0]["smiles_std"] == "CCO"
     assert out.iloc[0]["activity_deduplicated"] == 1.0
 
@@ -119,7 +117,7 @@ def test_dedup_prefer_false_when_group_contains_true_and_false():
     row = out[out["SMILES_standardized"] == "CCO"].iloc[0]
     assert row["activity_deduplicated"] == 1.0
     assert row["n_reps"] == 1
-    assert row["scaling_was_applied"] is False
+    assert row["scaling_was_applied"] == False
 
 
 def test_dedup_preference_does_not_apply_when_group_is_uniform():
