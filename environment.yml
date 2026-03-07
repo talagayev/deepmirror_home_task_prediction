@@ -12,6 +12,7 @@ dependencies:
       - chemprop>=2.2.0
       - lightgbm
       - xgboost
+      - autogluon
       - auto-sklearn2
       - scikit-learn
       - umap-learn
