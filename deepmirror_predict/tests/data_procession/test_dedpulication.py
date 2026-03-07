@@ -27,17 +27,17 @@ def test_dedup_mean_basic_with_smiles_like_keys():
     e = out[out["smiles_std"] == "CCO"].iloc[0]
     b = out[out["smiles_std"] == "c1ccccc1"].iloc[0]
 
-    assert e["y"] == 2.0
+    assert e["activity_deduplicated"] == 2.0
     assert e["n_reps"] == 2
-    assert np.isclose(e["y_std"], np.std([1.0, 3.0], ddof=1))
-    assert e["y_min"] == 1.0
-    assert e["y_max"] == 3.0
+    assert np.isclose(e["activity_std"], np.std([1.0, 3.0], ddof=1))
+    assert e["activity_min"] == 1.0
+    assert e["activity_max"] == 3.0
 
-    assert b["y"] == 10.0
+    assert b["activity_deduplicated"] == 10.0
     assert b["n_reps"] == 1
-    assert np.isnan(b["y_std"])
-    assert b["y_min"] == 10.0
-    assert b["y_max"] == 10.0
+    assert np.isnan(b["activity_std"])
+    assert b["activity_min"] == 10.0
+    assert b["activity_max"] == 10.0
 
 
 def test_dedup_keeps_first_nonnull_metadata_with_smiles_like_keys():
@@ -59,27 +59,31 @@ def test_dedup_keeps_first_nonnull_metadata_with_smiles_like_keys():
     )
     row = out.iloc[0]
 
-    # Here we check if it uses the metadata from the first with metadata
     assert row["smiles_std"] == "CCN"
-    assert row["y"] == 2.0
+    assert row["activity_deduplicated"] == 2.0
     assert row["assay_id"] == "assay_1"
     assert row["smiles"] == "CCN"
 
 
 def test_dedup_drops_missing_keys_and_targets_by_default():
-    """"""
     df = pd.DataFrame(
         {
             "smiles_std": ["CCO", None, "c1ccccc1"],
             "activity": [1.0, 2.0, None],
         }
     )
-    out = deduplicate_smiles(df, key_cols=("smiles_std",), target_col="activity", method="mean")
-    # Check if only CCO survived, since the others are missing smiles or activity
+
+    out = deduplicate_smiles(
+        df,
+        key_cols=("smiles_std",),
+        target_col="activity",
+        method="mean",
+    )
+
     assert len(out) == 1
     assert out.shape[0] == 1
     assert out.iloc[0]["smiles_std"] == "CCO"
-    assert out.iloc[0]["y"] == 1.0
+    assert out.iloc[0]["activity_deduplicated"] == 1.0
 
 
 def test_dedup_missing_columns_raise():
@@ -90,6 +94,7 @@ def test_dedup_missing_columns_raise():
 
     with pytest.raises(ValueError, match="Missing key_cols"):
         deduplicate_smiles(df, key_cols=("nope",), target_col="activity")
+
 
 def test_dedup_prefer_false_when_group_contains_true_and_false():
     df = pd.DataFrame(
@@ -112,9 +117,9 @@ def test_dedup_prefer_false_when_group_contains_true_and_false():
     )
 
     row = out[out["SMILES_standardized"] == "CCO"].iloc[0]
-    assert row["y"] == 1.0
+    assert row["activity_deduplicated"] == 1.0
     assert row["n_reps"] == 1
-    assert row["scaling_was_applied"] == False
+    assert row["scaling_was_applied"] is False
 
 
 def test_dedup_preference_does_not_apply_when_group_is_uniform():
@@ -136,7 +141,7 @@ def test_dedup_preference_does_not_apply_when_group_is_uniform():
     )
 
     row = out.iloc[0]
-    assert row["y"] == 2.0
+    assert row["activity_deduplicated"] == 2.0
     assert row["n_reps"] == 2
 
 
