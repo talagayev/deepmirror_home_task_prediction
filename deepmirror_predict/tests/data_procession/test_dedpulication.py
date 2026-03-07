@@ -90,3 +90,69 @@ def test_dedup_missing_columns_raise():
 
     with pytest.raises(ValueError, match="Missing key_cols"):
         deduplicate_smiles(df, key_cols=("nope",), target_col="activity")
+
+def test_dedup_prefer_false_when_group_contains_true_and_false():
+    df = pd.DataFrame(
+        {
+            "SMILES_standardized": ["CCO", "CCO", "c1ccccc1"],
+            "activity": [1.0, 3.0, 10.0],
+            "scaling_was_applied": [False, True, True],
+            "dataset": ["fang_dataset", "chembl_dataset", "chembl_dataset"],
+        }
+    )
+
+    out = deduplicate_smiles(
+        df,
+        key_cols=("SMILES_standardized",),
+        target_col="activity",
+        method="mean",
+        keep_cols=("dataset", "scaling_was_applied"),
+        prefer_col="scaling_was_applied",
+        prefer_value=False,
+    )
+
+    row = out[out["SMILES_standardized"] == "CCO"].iloc[0]
+    assert row["y"] == 1.0
+    assert row["n_reps"] == 1
+    assert row["scaling_was_applied"] == False
+
+
+def test_dedup_preference_does_not_apply_when_group_is_uniform():
+    df = pd.DataFrame(
+        {
+            "SMILES_standardized": ["CCO", "CCO"],
+            "activity": [1.0, 3.0],
+            "scaling_was_applied": [True, True],
+        }
+    )
+
+    out = deduplicate_smiles(
+        df,
+        key_cols=("SMILES_standardized",),
+        target_col="activity",
+        method="mean",
+        prefer_col="scaling_was_applied",
+        prefer_value=False,
+    )
+
+    row = out.iloc[0]
+    assert row["y"] == 2.0
+    assert row["n_reps"] == 2
+
+
+def test_dedup_preference_requires_value_if_column_is_given():
+    df = pd.DataFrame(
+        {
+            "SMILES_standardized": ["CCO"],
+            "activity": [1.0],
+            "scaling_was_applied": [False],
+        }
+    )
+
+    with pytest.raises(ValueError, match="prefer_value must be provided"):
+        deduplicate_smiles(
+            df,
+            key_cols=("SMILES_standardized",),
+            target_col="activity",
+            prefer_col="scaling_was_applied",
+        )
