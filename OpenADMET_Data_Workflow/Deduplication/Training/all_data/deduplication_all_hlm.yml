@@ -1,0 +1,7 @@
+deduplicate:
+  input: ../../../Preprocessing/Training/preprocessed/combined_dataset_training_preprocessed.csv
+  output: ./deduplicated/combined_dataset_training_deduplicated_hlm.csv
+  key_cols:
+    - SMILES_standardized
+  target_col: hlm_value_scaled
+  method: mean
