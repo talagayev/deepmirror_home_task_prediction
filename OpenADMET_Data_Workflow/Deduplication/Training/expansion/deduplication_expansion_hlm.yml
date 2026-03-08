@@ -1,0 +1,11 @@
+deduplicate:
+  input: ../../../Preprocessing/Training/preprocessed/openadmet_expansion_only_training_preprocessed.csv
+  output: ./deduplicated/openadmet_expansion_only_training_deduplicated_hlm.csv
+  key_cols:
+    - SMILES_standardized
+  keep_cols:
+    - SMILES
+    - mol_id
+    - dataset
+  target_col: hlm_value_scaled
+  method: mean
