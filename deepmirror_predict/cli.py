@@ -4,6 +4,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import yaml
 
 from deepmirror_predict.analysis.applicability_domain import (
@@ -49,6 +50,9 @@ def preprocess_smiles_dataframe(
     return df
 
 
+def _ensure_parent_dir(path: str) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+
 def _parse_csv_list(value: str) -> list[str]:
     return [x.strip() for x in value.split(",") if x.strip()]
 
@@ -65,11 +69,39 @@ def _load_yaml_config(path: str) -> dict:
     return data
 
 
+def _get_command_config(config: dict, command_name: str) -> dict:
+    section = config.get(command_name)
+    if isinstance(section, dict):
+        return section
+    return config
+
+
 def _get_arg_or_config(args, config: dict, name: str, default=None):
     value = getattr(args, name, None)
     if value is not None:
         return value
     return config.get(name, default)
+
+
+def _as_bool(value, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in {"1", "true", "yes", "y", "on"}:
+            return True
+        if v in {"0", "false", "no", "n", "off"}:
+            return False
+    raise ValueError(f"Cannot interpret {value!r} as boolean")
+
+
+def _resolve_bool_arg(args, config: dict, cli_name: str, config_name: str, default: bool) -> bool:
+    cli_value = getattr(args, cli_name, None)
+    if cli_value is not None:
+        return cli_value
+    return _as_bool(config.get(config_name), default)
 
 
 def main() -> None:
@@ -82,31 +114,112 @@ def main() -> None:
         "preprocess-smiles",
         help="Standardize SMILES from a CSV column",
     )
-    preprocess_parser.add_argument("--input", required=True, help="Path to input CSV")
-    preprocess_parser.add_argument("--output", required=True, help="Path to output CSV")
-    preprocess_parser.add_argument("--smiles-column", default="SMILES", help="Column containing SMILES strings")
-    preprocess_parser.add_argument("--output-column", default="SMILES_std", help="Column name for standardized SMILES")
-    preprocess_parser.add_argument("--reason-column", default="SMILES_std_reason", help="Column name for preprocessing status/reason")
-    preprocess_parser.add_argument("--keep-isomeric", action="store_true", default=True, help="Keep stereochemistry in output SMILES")
-    preprocess_parser.add_argument("--canonical-tautomer", action="store_true", default=True, help="Canonicalize tautomers")
-    preprocess_parser.add_argument("--uncharge", action="store_true", default=True, help="Uncharge molecules")
-    preprocess_parser.add_argument("--protonate", action="store_true", default=False, help="Protonate molecules at the requested pH")
-    preprocess_parser.add_argument("--ph", type=float, default=7.4, help="pH to use if protonation is enabled")
+    preprocess_parser.add_argument("--config", default=None, help="Path to YAML config file")
+    preprocess_parser.add_argument("--input", default=None, help="Path to input CSV")
+    preprocess_parser.add_argument("--output", default=None, help="Path to output CSV")
+    preprocess_parser.add_argument("--smiles-column", default=None, help="Column containing SMILES strings")
+    preprocess_parser.add_argument("--output-column", default=None, help="Column name for standardized SMILES")
+    preprocess_parser.add_argument("--reason-column", default=None, help="Column name for preprocessing status/reason")
+
+    preprocess_parser.add_argument(
+        "--keep-isomeric",
+        dest="keep_isomeric",
+        action="store_true",
+        default=None,
+        help="Keep stereochemistry in output SMILES",
+    )
+    preprocess_parser.add_argument(
+        "--no-keep-isomeric",
+        dest="keep_isomeric",
+        action="store_false",
+        help="Do not keep stereochemistry in output SMILES",
+    )
+
+    preprocess_parser.add_argument(
+        "--canonical-tautomer",
+        dest="canonical_tautomer",
+        action="store_true",
+        default=None,
+        help="Canonicalize tautomers",
+    )
+    preprocess_parser.add_argument(
+        "--no-canonical-tautomer",
+        dest="canonical_tautomer",
+        action="store_false",
+        help="Do not canonicalize tautomers",
+    )
+
+    preprocess_parser.add_argument(
+        "--uncharge",
+        dest="uncharge",
+        action="store_true",
+        default=None,
+        help="Uncharge molecules",
+    )
+    preprocess_parser.add_argument(
+        "--no-uncharge",
+        dest="uncharge",
+        action="store_false",
+        help="Do not uncharge molecules",
+    )
+
+    preprocess_parser.add_argument(
+        "--protonate",
+        dest="protonate",
+        action="store_true",
+        default=None,
+        help="Protonate molecules at the requested pH",
+    )
+    preprocess_parser.add_argument(
+        "--no-protonate",
+        dest="protonate",
+        action="store_false",
+        help="Do not protonate molecules",
+    )
+
+    preprocess_parser.add_argument("--ph", type=float, default=None, help="pH to use if protonation is enabled")
 
     dedup_parser = subparsers.add_parser(
         "deduplicate",
         help="Deduplicate rows by standardized SMILES and aggregate target values",
     )
-    dedup_parser.add_argument("--input", required=True, help="Path to input CSV")
-    dedup_parser.add_argument("--output", required=True, help="Path to output CSV")
-    dedup_parser.add_argument("--key-cols", default="SMILES_standardized", help="Comma-separated key columns")
-    dedup_parser.add_argument("--target-col", required=True, help="Target column to aggregate")
-    dedup_parser.add_argument("--method", choices=["mean", "median", "min", "max"], default="mean")
-    dedup_parser.add_argument("--keep-cols", default="", help="Comma-separated metadata columns to keep")
+    dedup_parser.add_argument("--config", default=None, help="Path to YAML config file")
+    dedup_parser.add_argument("--input", default=None, help="Path to input CSV")
+    dedup_parser.add_argument("--output", default=None, help="Path to output CSV")
+    dedup_parser.add_argument("--key-cols", default=None, help="Comma-separated key columns")
+    dedup_parser.add_argument("--target-col", default=None, help="Target column to aggregate")
+    dedup_parser.add_argument("--method", choices=["mean", "median", "min", "max"], default=None)
+    dedup_parser.add_argument("--keep-cols", default=None, help="Comma-separated metadata columns to keep")
     dedup_parser.add_argument("--prefer-col", default=None, help="Optional preference column")
     dedup_parser.add_argument("--prefer-value", default=None, help="Optional preferred value in prefer-col")
-    dedup_parser.add_argument("--keep-missing-keys", action="store_true")
-    dedup_parser.add_argument("--keep-missing-target", action="store_true")
+
+    dedup_parser.add_argument(
+        "--keep-missing-keys",
+        dest="keep_missing_keys",
+        action="store_true",
+        default=None,
+        help="Keep rows with missing key columns",
+    )
+    dedup_parser.add_argument(
+        "--drop-missing-keys",
+        dest="keep_missing_keys",
+        action="store_false",
+        help="Drop rows with missing key columns",
+    )
+
+    dedup_parser.add_argument(
+        "--keep-missing-target",
+        dest="keep_missing_target",
+        action="store_true",
+        default=None,
+        help="Keep rows with missing target values",
+    )
+    dedup_parser.add_argument(
+        "--drop-missing-target",
+        dest="keep_missing_target",
+        action="store_false",
+        help="Drop rows with missing target values",
+    )
 
     ad_parser = subparsers.add_parser(
         "applicability-domain",
@@ -156,41 +269,92 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "preprocess-smiles":
-        df = pd.read_csv(args.input)
+        full_config = _load_yaml_config(args.config) if args.config else {}
+        config = _get_command_config(full_config, args.command)
+
+        input_path = _get_arg_or_config(args, config, "input")
+        output_path = _get_arg_or_config(args, config, "output")
+        smiles_column = _get_arg_or_config(args, config, "smiles_column", "SMILES")
+        output_column = _get_arg_or_config(args, config, "output_column", "SMILES_std")
+        reason_column = _get_arg_or_config(args, config, "reason_column", "SMILES_std_reason")
+
+        keep_isomeric = _resolve_bool_arg(args, config, "keep_isomeric", "keep_isomeric", True)
+        canonical_tautomer = _resolve_bool_arg(args, config, "canonical_tautomer", "canonical_tautomer", True)
+        uncharge = _resolve_bool_arg(args, config, "uncharge", "uncharge", True)
+        protonate = _resolve_bool_arg(args, config, "protonate", "protonate", False)
+        ph = float(_get_arg_or_config(args, config, "ph", 7.4))
+
+        if input_path is None or output_path is None:
+            raise ValueError("input and output must be provided via CLI or YAML config")
+
+        df = pd.read_csv(input_path)
 
         df_out = preprocess_smiles_dataframe(
             df=df,
-            smiles_column=args.smiles_column,
-            output_column=args.output_column,
-            reason_column=args.reason_column,
-            keep_isomeric=args.keep_isomeric,
-            canonical_tautomer=args.canonical_tautomer,
-            uncharge=args.uncharge,
-            protonate=args.protonate,
-            ph=args.ph,
+            smiles_column=smiles_column,
+            output_column=output_column,
+            reason_column=reason_column,
+            keep_isomeric=keep_isomeric,
+            canonical_tautomer=canonical_tautomer,
+            uncharge=uncharge,
+            protonate=protonate,
+            ph=ph,
         )
-        df_out.to_csv(args.output, index=False)
+        _ensure_parent_dir(output_path)
+        df_out.to_csv(output_path, index=False)
 
     elif args.command == "deduplicate":
-        df = pd.read_csv(args.input)
-        key_cols = _parse_csv_list(args.key_cols)
-        keep_cols = _parse_csv_list(args.keep_cols) if args.keep_cols else []
+        full_config = _load_yaml_config(args.config) if args.config else {}
+        config = _get_command_config(full_config, args.command)
+
+        input_path = _get_arg_or_config(args, config, "input")
+        output_path = _get_arg_or_config(args, config, "output")
+        key_cols_value = _get_arg_or_config(args, config, "key_cols", "SMILES_standardized")
+        target_col = _get_arg_or_config(args, config, "target_col")
+        method = _get_arg_or_config(args, config, "method", "mean")
+        keep_cols_value = _get_arg_or_config(args, config, "keep_cols", "")
+        prefer_col = _get_arg_or_config(args, config, "prefer_col")
+        prefer_value = _get_arg_or_config(args, config, "prefer_value")
+
+        keep_missing_keys = _resolve_bool_arg(args, config, "keep_missing_keys", "keep_missing_keys", False)
+        keep_missing_target = _resolve_bool_arg(args, config, "keep_missing_target", "keep_missing_target", False)
+
+        if input_path is None or output_path is None or target_col is None:
+            raise ValueError("input, output and target_col must be provided via CLI or YAML config")
+
+        df = pd.read_csv(input_path)
+
+        if isinstance(key_cols_value, str):
+            key_cols = _parse_csv_list(key_cols_value)
+        elif isinstance(key_cols_value, list):
+            key_cols = [str(x).strip() for x in key_cols_value if str(x).strip()]
+        else:
+            raise ValueError("key_cols in config must be a list or comma-separated string")
+
+        if isinstance(keep_cols_value, str):
+            keep_cols = _parse_csv_list(keep_cols_value) if keep_cols_value else []
+        elif isinstance(keep_cols_value, list):
+            keep_cols = [str(x).strip() for x in keep_cols_value if str(x).strip()]
+        else:
+            raise ValueError("keep_cols in config must be a list or comma-separated string")
 
         df_out = deduplicate_smiles(
             df=df,
             key_cols=key_cols,
-            target_col=args.target_col,
-            method=args.method,
+            target_col=target_col,
+            method=method,
             keep_cols=keep_cols,
-            drop_missing_keys=not args.keep_missing_keys,
-            drop_missing_target=not args.keep_missing_target,
-            prefer_col=args.prefer_col,
-            prefer_value=args.prefer_value,
+            drop_missing_keys=not keep_missing_keys,
+            drop_missing_target=not keep_missing_target,
+            prefer_col=prefer_col,
+            prefer_value=prefer_value,
         )
-        df_out.to_csv(args.output, index=False)
+        _ensure_parent_dir(output_path)
+        df_out.to_csv(output_path, index=False)
 
     elif args.command == "applicability-domain":
-        config = _load_yaml_config(args.config) if args.config else {}
+        full_config = _load_yaml_config(args.config) if args.config else {}
+        config = _get_command_config(full_config, args.command)
 
         train_input = _get_arg_or_config(args, config, "train_input")
         test_input = _get_arg_or_config(args, config, "test_input")
@@ -361,8 +525,10 @@ def main() -> None:
                 train_all_p5_cutoff=train_all_p5_cutoff,
                 train_finetune_p5_cutoff=train_finetune_p5_cutoff,
             )
+            _ensure_parent_dir(test_output)
             df_test_out.to_csv(test_output, index=False)
 
+            _ensure_parent_dir(plot_output)
             plot_dual_applicability_domain(
                 embedding_coords=result.embedding_coords,
                 n_train_other=result.n_train_other,
