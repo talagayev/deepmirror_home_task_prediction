@@ -1,0 +1,11 @@
+deduplicate:
+  input: ../../../Preprocessing/Training/preprocessed/all_training_novartis_preprocessed.csv
+  output: ./deduplicated/all_training_novartis_deduplicated_hlm_log1p.csv
+  key_cols:
+    - SMILES_standardized
+  keep_cols:
+    - SMILES
+    - mol_id
+    - dataset
+  target_col: hlm_value_scaled_log1p
+  method: mean
