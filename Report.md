@@ -83,3 +83,10 @@ After the CV the best performing model was obtained after refitting.
 ## Prediction & Evaluation
 
 The models were used for predicting the test set and finally evaluated using the [evaluation metrics provided by OpenADMET](https://github.com/OpenADMET/ExpansionRx-Challenge-Tutorial/blob/main/eval/eval.py)
+
+
+| Dataset | mean MAE | std_MAE | mean RAE | std_RAE | mean R2 | std_R2 |
+|-----------------|----------------|----------------|----------------|----------------|----------------|----------------|
+| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
+| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
+| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
