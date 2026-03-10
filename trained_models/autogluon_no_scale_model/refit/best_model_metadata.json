@@ -1,0 +1,21 @@
+{
+  "model": "autogluon",
+  "feature_set": "chemeleon",
+  "primary_metric": "mae",
+  "summary_row": {
+    "model": "autogluon",
+    "feature_set": "chemeleon",
+    "rmse_mean": 1.0570798993929185,
+    "rmse_std": 0.03604749932849873,
+    "mae_mean": 0.8017737012400955,
+    "mae_std": 0.025109218952184584,
+    "r2_mean": 0.4957880532428918,
+    "r2_std": 0.02080818766115441,
+    "spearman_rho_mean": 0.7064108013627125,
+    "spearman_rho_std": 0.019274986921628295
+  },
+  "best_params": {
+    "presets": "best_quality",
+    "time_limit_s": 300
+  }
+}
