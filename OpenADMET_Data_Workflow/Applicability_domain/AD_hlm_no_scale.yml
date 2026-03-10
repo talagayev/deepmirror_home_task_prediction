@@ -1,0 +1,31 @@
+train_input: ../../Deduplication/Training/no_scale/deduplicated/combined_dataset_training_no_scaling_deduplicated_hlm.csv
+test_input: ../../Preprocessing/Test/preprocessed/expansion_data_test_adjusted_preprocessed.csv
+output_dir: AD_no_scale_hlm
+
+smiles_column: SMILES_standardized
+embedding_method: umap
+top_k: 5
+
+tanimoto_cutoff: 0.40
+cosine_cutoff: 0.80
+use_train_p5_cutoff: true
+best_by: finetune_p5
+
+finetune_subset_column: dataset
+finetune_subset_values:
+  - openadmet_expansion_train
+
+feature_sets:
+  - rdkit_path
+  - chemeleon
+  - chemeleon + rdkit_path
+  - chemeleon + morgan
+  - morgan
+  - avalon
+
+morgan_radius: [2, 3]
+morgan_bits: [1024, 2048, 4096]
+
+rdkit_path_min: [3, 4]
+rdkit_path_max: [5, 6, 7, 8]
+rdkit_path_bits: [1024, 2048, 4096]
