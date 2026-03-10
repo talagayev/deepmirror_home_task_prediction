@@ -1,0 +1,6 @@
+predict-model:
+  input: ../Preprocessing/Test/preprocessed/expansion_data_test_adjusted_preprocessed.csv
+  refit_dir: ../Crossvalidation/all_novartis/autogluon_all_novartis_hlm_crossvalidation_log1p_chemeleon_best/refit
+  output: outputs/predictions_all_novartis_scaffold_chemeleon.csv
+  smiles_column: SMILES_standardized
+  prediction_column: y_pred_log1p
