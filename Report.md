@@ -84,9 +84,13 @@ After the CV the best performing model was obtained after refitting.
 
 The models were used for predicting the test set and finally evaluated using the [evaluation metrics provided by OpenADMET](https://github.com/OpenADMET/ExpansionRx-Challenge-Tutorial/blob/main/eval/eval.py)
 
+Here is the jupyter notebook used for the [evaluation of the results](https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Evaluation/Evaluation.ipynb):
 
-| Dataset | mean MAE | std_MAE | mean RAE | std_RAE | mean R2 | std_R2 |
-|-----------------|----------------|----------------|----------------|----------------|----------------|----------------|
-| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
-| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
-| Expansion_Chemprop_Chemeleon     | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    | 0.303279    | Chemeleon    |
+| Name | Endpoint | mean_MAE | mean_RAE | mean_R2 | mean_Spearman R | mean_Kendall's Tau | std_MAE | std_RAE | std_R2 | std_Spearman R | std_Kendall's Tau |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Expansion_Chemprop_Chemeleon | HLM | 0.287312 | 0.783742 | 0.337835 | 0.626342 | 0.445753 | 0.008625 | 0.023417 | 0.035346 | 0.023421 | 0.018854 |
+| Expansion_Autogluon_Chemeleon | HLM | 0.305677 | 0.833865 | 0.287409 | 0.601983 | 0.422438 | 0.008584 | 0.024212 | 0.037064 | 0.024118 | 0.018819 |
+| No_scale_Autogluon_Chemeleon | HLM | 0.312914 | 0.853602 | 0.228064 | 0.586194 | 0.417628 | 0.009238 | 0.025866 | 0.042334 | 0.025499 | 0.019976 |
+| All_Autogluon_Chemeleon | HLM | 0.324737 | 0.885854 | 0.175903 | 0.552629 | 0.395399 | 0.009453 | 0.026394 | 0.047395 | 0.027840 | 0.021445 |
+| All_Novartis_Autogluon_Chemeleon | HLM | 0.330205 | 0.900845 | 0.185863 | 0.503487 | 0.356561 | 0.008884 | 0.027546 | 0.049547 | 0.030463 | 0.022984 |
+
