@@ -10,8 +10,8 @@ Due to not having particiapated in the challenge itself all of the steps of the 
 The first step consisted in the gathering of all the training and test data, that would be used for training the model and then the predictions.
 
 For the Training data the following datasets were used:
-1. [ChEMBL Data](https://www.ebi.ac.uk/chembl/) containing as well the [AZ dataset](https://www.ebi.ac.uk/chembl/explore/assay/CHEMBL3301370)
-2. [OpenADMET Polaris](https://polarishub.io/datasets/asap-discovery/antiviral-admet-2025-unblinded)
+1. [ChEMBL Data](https://www.ebi.ac.uk/chembl/) containing as well the [AZ dataset](https://www.ebi.ac.uk/chembl/explore/assay/CHEMBL3301370) --> Containing 11702 intrinsic clearnace data points
+2. [OpenADMET Polaris](https://polarishub.io/datasets/asap-discovery/antiviral-admet-2025-unblinded) --> 
 3. [Biogen/Fang dataset](https://github.com/molecularinformatics/Computational-ADME)
 4. [OpenADMET ExpansionRx Training data](https://huggingface.co/datasets/openadmet/openadmet-expansionrx-challenge-train-data)
 5. [Novartis dataset](https://www.nature.com/articles/s41467-024-49979-3)
@@ -26,4 +26,18 @@ For each of the datasets the following procedure was performed:
 
 ### Scaling of in vitro to in vivo
 2. An important point during this home away task was to try to establish and identify a way to align external data to use it for HLM CLint predictions. Here one thing that I noticed during the data curation consisted in the variance of units that are used to display `HLM CLint`. Here mainly two units are often used to describe it, those being `uM/min/mg` and `mg/min/kg` with one being the value obtained from assays, while the second one is the extrapolated value using the average human liver microsome mass and human body weight. Here is a (short explanation)[https://www.sciencedirect.com/topics/chemistry/intrinsic-clearance].
+
+<img src="https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Figures/HLM_scaling.png" height="250">
+
+While [certain sources](https://www.epa.gov/system/files/documents/2021-07/exhibit_a_supp_mat_c_ivive_literature_review_07152021.pdf) claim that the correct values to be used are `40 mg/g liver` and `27 g of liver/kg body weight` [other sources](https://doi.org/10.1016/B978-0-12-820018-6.00022-3) claim that for the extrapolation for the human microsomes `40 mg/g liver` and `21 g of liver/kg body weight` should be used.
+Depending on what values are used this means that all the data points containing `uM/min/mg` need to be multiplied by a factor of `0.840` or `1.028`. While for this study I used the latter factor, since I relied on it coming from a reliable source I would also look into the `0.840` factor as well, to understand if the predicted values would correlate more with the true values. 
+
+With the test set that we need to predict containing `mg/min/kg` values an extrapolation was done. While the `1.028` does not sound significant for a mouse the extrapolation values can range around a factor of `2-3` depending on what values are used.
+
+This affected the datasets in a following way:
+1. ChEMBL contained `8859` molecules which needed to be extrapolated, while only `2843` contained the extrapolated valules. The AZ dataset values needed to be extrapolated
+2. Fang dataset contained already `mg/min/kg` values and thus no extrapolation was required.
+3. OpenADMET Polaris dataset contained `uM/min/mg` values so extrapolation was required.
+4. ExpansionRx training dataset contained `mg/min/kg` data points and thus no extrapolation was required
+5. Novartis dataset didn't contain any information about the units, so here due to the small factor and PC power restrictions no extrapolation was done.
 
