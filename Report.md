@@ -94,3 +94,17 @@ Here is the jupyter notebook used for the [evaluation of the results](https://gi
 | All_Autogluon_Chemeleon | HLM | 0.324737 | 0.885854 | 0.175903 | 0.552629 | 0.395399 | 0.009453 | 0.026394 | 0.047395 | 0.027840 | 0.021445 |
 | All_Novartis_Autogluon_Chemeleon | HLM | 0.330205 | 0.900845 | 0.185863 | 0.503487 | 0.356561 | 0.008884 | 0.027546 | 0.049547 | 0.030463 | 0.022984 |
 
+Here is the plot of the best performing model:
+
+<img src="https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Figures/ExpansionRX_Chemprop.png" height="500">
+
+## Conclusion
+
+Overall the HLM CLint is quite a difficult data point to predict, mainly due to the fact, that the assays are quite noisy, as shown by OpenADMET with the provided data down below:
+| Property | Compound | Count | Min | Max | SD | Mean abs. dev. | Median abs. dev. | Mean | Median |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| HLM CLint | Verapamil | 359 | 104.68 | 304.07 | 61.28 | 57.58 | 61.9 | 197.84 | 210.25 |
+
+Additionally, the fact that the extrapolation is required for the unit conversion from `uM/min/mg` to `mg/min/kg` with various factors that can be used makes it difficult to predict the applicability of those values for prediction, while also the papers themselves usually not going into details about the extrapolation and just mentioning that they followed a standard procedure for this, which is not disclosed in the paper. This leads to difficulty of using external data for HLM predictions. Certain databases lack the information if the values were extrapolated like is the case with the `Novartis` data set, where no information is given upon the units predicted and with this data set consisting of predicted values and 270.000 data points influences the other data a lot.
+
+From my point of view the best approach would be to discuss with experimental people that perform the assays and are aware about extrapolation what the best defaults would be for the extrapolation of `uM/min/mg` to `mg/min/kg`, benchmark on MLM CLint if this works, since there again the factor is higher then for HLM and also used fine tuning on the data from the same provider, due to the conditions playing a crucial role in the HLM predictions.
