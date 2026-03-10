@@ -1,0 +1,6 @@
+predict-model:
+  input: path/to/test.csv
+  refit_dir: path/to/model/refit
+  output: outputs/predictions_expansion_scaffold.csv
+  smiles_column: SMILES_standardized
+  prediction_column: y_pred_log1p

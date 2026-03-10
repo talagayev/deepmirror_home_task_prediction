@@ -1,0 +1,11 @@
+deduplicate:
+  input: path/to/input/csv
+  output: path/to/output/csv
+  key_cols:
+    - SMILES_standardized
+  keep_cols:
+    - SMILES
+    - mol_id
+    - dataset
+  target_col: hlm_value_scaled
+  method: mean
