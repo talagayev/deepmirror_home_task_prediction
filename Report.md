@@ -1,7 +1,7 @@
 Report for OpenADMET HLM CLint Prediction
 ==============================
 
-In this workflow a model was built for the prediction of the human liver microsome (HLM) intrinsic clearance [mg/min/kg] with the benchmarking data used being the test set of the [OpenADMET ExpansionRx challenge](https://huggingface.co/datasets/openadmet/openadmet-expansionrx-challenge-data).
+In this workflow a model was built for the prediction of the human liver microsome (HLM) intrinsic clearance `mg/min/kg` with the benchmarking data used being the test set of the [OpenADMET ExpansionRx challenge](https://huggingface.co/datasets/openadmet/openadmet-expansionrx-challenge-data).
 
 Due to not having particiapated in the challenge itself all of the steps of the workflow and the building of the workflow were performed during the home task timeline.
 
