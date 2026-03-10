@@ -68,7 +68,7 @@ This information will be later used for the evaluation to identify the results f
 
 Here sadly it is the case, that due to me having a slow PC and having only a certain timeline for the predictions I was at this step limited for the selection of Model + Feature combinations.
 
-I used Autogluon and Chemprop for model Crossvalidation/Training and building.
+I used Autogluon and Chemprop for model Crossvalidation/Training and building. For the splitting the `scaffold split` was applied
 
 I was able to run Autogluon with the ExpansionRx dataset for all features, while for the remainder I focused on Chemeleon, due to me requiring to do crossvalidation only for chemeleon itself, while for the FPs, I would need to test out the most preferable combination with Chemprop taking too long on my PC and thus I was able to get the final predictions for the `No Scale` and `All` datasets for Chemprop on the final day with only some hours left before the deadline.
 
