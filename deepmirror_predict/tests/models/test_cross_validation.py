@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import numpy as np
@@ -10,13 +11,27 @@ import pandas as pd
 import pytest
 
 
-@pytest.fixture()
-def cv_module(monkeypatch):
-    """Import cross_validation with lightweight stubs for optional heavy deps.
+@contextmanager
+def _temporary_sysmodules(replacements: dict[str, object]):
+    saved = {}
+    missing = object()
 
-    The stubs are installed only for the duration of each test so they do not
-    leak into the rest of the test suite.
-    """
+    for name, module in replacements.items():
+        saved[name] = sys.modules.get(name, missing)
+        sys.modules[name] = module
+
+    try:
+        yield
+    finally:
+        for name, previous in saved.items():
+            if previous is missing:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+
+
+@pytest.fixture()
+def cv_module():
     sys.modules.pop("deepmirror_predict.models.cross_validation", None)
 
     chemeleon_feature_stub = types.ModuleType("deepmirror_predict.features.chemeleon")
@@ -30,7 +45,6 @@ def cv_module(monkeypatch):
 
     chemeleon_feature_stub.CheMeleonConfig = CheMeleonConfig
     chemeleon_feature_stub.chemeleon_batch_from_smiles = chemeleon_batch_from_smiles
-    monkeypatch.setitem(sys.modules, "deepmirror_predict.features.chemeleon", chemeleon_feature_stub)
 
     mordred_feature_stub = types.ModuleType("deepmirror_predict.features.mordred")
 
@@ -42,7 +56,6 @@ def cv_module(monkeypatch):
 
     mordred_feature_stub.mordred2d_batch_from_smiles = mordred2d_batch_from_smiles
     mordred_feature_stub.prune_mordred_matrix = prune_mordred_matrix
-    monkeypatch.setitem(sys.modules, "deepmirror_predict.features.mordred", mordred_feature_stub)
 
     chemprop_stub = types.ModuleType("deepmirror_predict.models.chemprop_regression")
 
@@ -64,7 +77,6 @@ def cv_module(monkeypatch):
 
     chemprop_stub.ChempropConfig = ChempropConfig
     chemprop_stub.ChempropRegressor = ChempropRegressor
-    monkeypatch.setitem(sys.modules, "deepmirror_predict.models.chemprop_regression", chemprop_stub)
 
     autogluon_stub = types.ModuleType("deepmirror_predict.models.autogluon_regressor")
 
@@ -85,11 +97,20 @@ def cv_module(monkeypatch):
 
     autogluon_stub.AutoGluonConfig = AutoGluonConfig
     autogluon_stub.AutoGluonRegressor = AutoGluonRegressor
-    monkeypatch.setitem(sys.modules, "deepmirror_predict.models.autogluon_regressor", autogluon_stub)
 
-    module = importlib.import_module("deepmirror_predict.models.cross_validation")
-    yield module
-    sys.modules.pop("deepmirror_predict.models.cross_validation", None)
+    replacements = {
+        "deepmirror_predict.features.chemeleon": chemeleon_feature_stub,
+        "deepmirror_predict.features.mordred": mordred_feature_stub,
+        "deepmirror_predict.models.chemprop_regression": chemprop_stub,
+        "deepmirror_predict.models.autogluon_regressor": autogluon_stub,
+    }
+
+    with _temporary_sysmodules(replacements):
+        module = importlib.import_module("deepmirror_predict.models.cross_validation")
+        try:
+            yield module
+        finally:
+            sys.modules.pop("deepmirror_predict.models.cross_validation", None)
 
 
 @pytest.fixture()
