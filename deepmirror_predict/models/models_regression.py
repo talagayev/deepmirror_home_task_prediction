@@ -178,14 +178,14 @@ def fit_predict(
     model: ModelName,
     params: Optional[Dict[str, Any]] = None,
     cfg: Optional[TrainConfig] = None,
-    y_valid: Optional[np.ndarray] = None,  # required for chemprop (eval_set)
+    y_valid: Optional[np.ndarray] = None,  # required for chemprop / optional for autogluon
 ) -> Tuple[np.ndarray, Any]:
     """
     Fit model on (X_train, y_train) and predict on X_valid.
 
     - For numeric models: X_* are float32 feature matrices.
     - For chemprop: X_* are SMILES arrays/lists (object dtype).
-      Chemprop requires y_valid to be provided so it can early-stop/checkpoint on validation loss.
+    - For autogluon: X_* are numeric feature matrices; eval_set is optional.
 
     Returns: (y_pred, fitted_pipeline)
     """
@@ -206,15 +206,16 @@ def fit_predict(
             raise ValueError("fit_predict(model='chemprop') requires y_valid for eval_set.")
         y_valid = np.asarray(y_valid, dtype=np.float32)
         pipe.fit(X_train, y_train, model__eval_set=[(X_valid, y_valid)])
-    else:
-        pipe.fit(X_train, y_train)
 
-    if model == "autogluon":
+    elif model == "autogluon":
         if y_valid is not None:
             y_valid = np.asarray(y_valid, dtype=np.float32)
             pipe.fit(X_train, y_train, model__eval_set=[(X_valid, y_valid)])
         else:
             pipe.fit(X_train, y_train)
+
+    else:
+        pipe.fit(X_train, y_train)
 
     y_pred = pipe.predict(X_valid).astype(np.float32, copy=False)
     return y_pred, pipe

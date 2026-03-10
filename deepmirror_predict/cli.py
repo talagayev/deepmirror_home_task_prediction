@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pathlib import Path
 import yaml
 
 from deepmirror_predict.analysis.applicability_domain import (
@@ -17,6 +17,14 @@ from deepmirror_predict.analysis.applicability_domain import (
 )
 from deepmirror_predict.data_preprocession.dedpulication import deduplicate_smiles
 from deepmirror_predict.data_preprocession.preprocessing import standardize_smiles
+from deepmirror_predict.models.cross_validation import (
+    FeatureConfig,
+    OptimizationConfig,
+    RunConfig,
+    SplitConfig,
+    run_nested_cross_validation,
+)
+from deepmirror_predict.models.predict_model import predict_from_refit
 
 
 def preprocess_smiles_dataframe(
@@ -52,6 +60,7 @@ def preprocess_smiles_dataframe(
 
 def _ensure_parent_dir(path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
+
 
 def _parse_csv_list(value: str) -> list[str]:
     return [x.strip() for x in value.split(",") if x.strip()]
@@ -104,9 +113,85 @@ def _resolve_bool_arg(args, config: dict, cli_name: str, config_name: str, defau
     return _as_bool(config.get(config_name), default)
 
 
+def _ensure_int_list(value, default: list[int]) -> list[int]:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return _parse_csv_int_list(value)
+    if isinstance(value, int):
+        return [value]
+    if isinstance(value, list):
+        return [int(x) for x in value]
+    raise ValueError(f"Expected int/list[str]/list[int], got {type(value)}")
+
+
+def _expand_cv_feature_sets(
+    base_feature_sets: list[str],
+    *,
+    morgan_radius: list[int] | int | None = None,
+    morgan_bits: list[int] | int | None = None,
+    avalon_bits: list[int] | int | None = None,
+    rdkit_path_min: list[int] | int | None = None,
+    rdkit_path_max: list[int] | int | None = None,
+    rdkit_path_bits: list[int] | int | None = None,
+) -> list[str]:
+    """
+    Like applicability-domain expand_feature_sets(), but also supports feature sets
+    that include a Chemprop-only 'smiles' backbone token, e.g.:
+      - smiles
+      - smiles+morgan
+      - smiles+morgan+avalon
+      - smiles+rdkit_path+mordred
+    """
+    expanded: list[str] = []
+
+    for feature_set in base_feature_sets:
+        parts = [p.strip() for p in feature_set.split("+") if p.strip()]
+        if not parts:
+            continue
+
+        if "smiles" not in parts:
+            expanded.extend(
+                expand_feature_sets(
+                    [feature_set],
+                    morgan_radius=morgan_radius,
+                    morgan_bits=morgan_bits,
+                    avalon_bits=avalon_bits,
+                    rdkit_path_min=rdkit_path_min,
+                    rdkit_path_max=rdkit_path_max,
+                    rdkit_path_bits=rdkit_path_bits,
+                )
+            )
+            continue
+
+        other_parts = [p for p in parts if p != "smiles"]
+        if not other_parts:
+            expanded.append("smiles")
+            continue
+
+        expanded_suffixes = expand_feature_sets(
+            ["+".join(other_parts)],
+            morgan_radius=morgan_radius,
+            morgan_bits=morgan_bits,
+            avalon_bits=avalon_bits,
+            rdkit_path_min=rdkit_path_min,
+            rdkit_path_max=rdkit_path_max,
+            rdkit_path_bits=rdkit_path_bits,
+        )
+        expanded.extend([f"smiles+{suffix}" for suffix in expanded_suffixes])
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for fs in expanded:
+        if fs not in seen:
+            seen.add(fs)
+            deduped.append(fs)
+    return deduped
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="DeepMirror preprocessing, deduplication and applicability-domain CLI"
+        description="DeepMirror preprocessing, deduplication, cross-validation and applicability-domain CLI"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -212,58 +297,127 @@ def main() -> None:
         dest="keep_missing_target",
         action="store_true",
         default=None,
-        help="Keep rows with missing target values",
+        help="Keep rows with missing target",
     )
     dedup_parser.add_argument(
         "--drop-missing-target",
         dest="keep_missing_target",
         action="store_false",
-        help="Drop rows with missing target values",
+        help="Drop rows with missing target",
     )
+
+    cv_parser = subparsers.add_parser(
+        "model-crossvalidation",
+        help="Run nested cross-validation with configurable splits, features, models and metrics",
+    )
+    cv_parser.add_argument("--config", default=None, help="Path to YAML config file")
+
+    predict_parser = subparsers.add_parser(
+        "predict-model",
+        help="Run inference with a saved refit model from nested cross-validation",
+    )
+    predict_parser.add_argument("--config", default=None, help="Path to YAML config file")
+    predict_parser.add_argument("--input", default=None, help="Path to prediction CSV")
+    predict_parser.add_argument("--refit-dir", default=None, help="Path to the saved refit directory")
+    predict_parser.add_argument("--output", default=None, help="Path to output CSV with predictions")
+    predict_parser.add_argument("--smiles-column", default=None, help="Column containing standardized SMILES")
+    predict_parser.add_argument("--prediction-column", default=None, help="Name of output prediction column")
 
     ad_parser = subparsers.add_parser(
         "applicability-domain",
         help="Assess whether test molecules are in the applicability domain of the training set and a fine-tune subset",
     )
     ad_parser.add_argument("--config", default=None, help="Path to YAML config file")
+
     ad_parser.add_argument("--train-input", default=None, help="Path to training CSV")
     ad_parser.add_argument("--test-input", default=None, help="Path to test CSV")
-    ad_parser.add_argument("--test-output", default=None, help="Single-run output CSV")
-    ad_parser.add_argument("--plot-output", default=None, help="Single-run plot PNG")
-    ad_parser.add_argument("--output-dir", default=None, help="Batch-mode output directory")
+    ad_parser.add_argument("--test-output", default=None, help="Path to output CSV with AD flags")
+    ad_parser.add_argument("--plot-output", default=None, help="Path to output plot PNG")
+    ad_parser.add_argument("--output-dir", default=None, help="Directory for batch mode outputs")
     ad_parser.add_argument("--smiles-column", default=None, help="Column containing standardized SMILES")
 
-    ad_parser.add_argument("--feature-set", default=None, help="Single feature set")
-    ad_parser.add_argument("--feature-sets", default=None, help="Comma-separated base feature sets for batch mode")
-
-    ad_parser.add_argument("--embedding-method", choices=["pca", "umap"], default=None)
-    ad_parser.add_argument("--top-k", type=int, default=None)
-    ad_parser.add_argument("--tanimoto-cutoff", type=float, default=None)
-    ad_parser.add_argument("--cosine-cutoff", type=float, default=None)
+    ad_parser.add_argument("--feature-set", default=None, help="Single feature set for one run")
     ad_parser.add_argument(
-        "--best-by",
-        choices=["all_train_p5", "finetune_p5", "user_cutoff_all", "user_cutoff_finetune"],
+        "--feature-sets",
         default=None,
+        help=(
+            "Comma-separated base feature sets for batch mode. "
+            "Use morgan, avalon, rdkit_path, mordred or combinations like "
+            "'morgan+avalon', 'rdkit_path+mordred'. Morgan/Avalon/RDKit path "
+            "placeholders will be expanded using the provided size/radius/path settings."
+        ),
     )
 
-    ad_parser.add_argument("--morgan-radius", default=None)
-    ad_parser.add_argument("--morgan-bits", default=None)
-    ad_parser.add_argument("--avalon-bits", default=None)
-    ad_parser.add_argument("--rdkit-path-min", default=None)
-    ad_parser.add_argument("--rdkit-path-max", default=None)
-    ad_parser.add_argument("--rdkit-path-bits", default=None)
+    ad_parser.add_argument(
+        "--morgan-radius",
+        default=None,
+        help="Comma-separated Morgan radii to expand, e.g. 2,3",
+    )
+    ad_parser.add_argument(
+        "--morgan-bits",
+        default=None,
+        help="Comma-separated Morgan bit sizes to expand, e.g. 512,1024",
+    )
+    ad_parser.add_argument(
+        "--avalon-bits",
+        default=None,
+        help="Comma-separated Avalon bit sizes to expand, e.g. 512,1024",
+    )
+    ad_parser.add_argument(
+        "--rdkit-path-min",
+        default=None,
+        help="Comma-separated RDKit path minimum lengths to expand, e.g. 1",
+    )
+    ad_parser.add_argument(
+        "--rdkit-path-max",
+        default=None,
+        help="Comma-separated RDKit path maximum lengths to expand, e.g. 5,7",
+    )
+    ad_parser.add_argument(
+        "--rdkit-path-bits",
+        default=None,
+        help="Comma-separated RDKit path bit sizes to expand, e.g. 512,1024",
+    )
 
-    ad_parser.add_argument("--use-train-p5-cutoff", action="store_true")
-
+    ad_parser.add_argument(
+        "--embedding-method",
+        choices=["pca", "tsne"],
+        default=None,
+        help="2D embedding method for visualization",
+    )
+    ad_parser.add_argument("--top-k", type=int, default=None, help="Top-k neighbors for mean similarity")
+    ad_parser.add_argument(
+        "--tanimoto-cutoff",
+        type=float,
+        default=None,
+        help="User cutoff for binary fingerprints (Morgan/Avalon/RDKit path)",
+    )
+    ad_parser.add_argument(
+        "--cosine-cutoff",
+        type=float,
+        default=None,
+        help="User cutoff for continuous descriptors (Mordred)",
+    )
+    ad_parser.add_argument(
+        "--use-train-p5-cutoff",
+        action="store_true",
+        help="Also report AD flags using the 5th percentile of training nearest-neighbor similarity",
+    )
+    ad_parser.add_argument(
+        "--best-by",
+        choices=["finetune_p5", "all_p5", "median_finetune", "median_all"],
+        default=None,
+        help="Criterion to select the best feature set in batch mode",
+    )
     ad_parser.add_argument(
         "--finetune-subset-column",
         default=None,
-        help="Training column used to define fine-tune subset, e.g. dataset",
+        help="Column in training data identifying the fine-tune subset",
     )
     ad_parser.add_argument(
         "--finetune-subset-values",
         default=None,
-        help="Comma-separated values for fine-tune subset, e.g. openadmet_expansion_train,openadmet_polaris",
+        help="Comma-separated values in finetune-subset-column to define the fine-tune subset",
     )
 
     args = parser.parse_args()
@@ -275,8 +429,8 @@ def main() -> None:
         input_path = _get_arg_or_config(args, config, "input")
         output_path = _get_arg_or_config(args, config, "output")
         smiles_column = _get_arg_or_config(args, config, "smiles_column", "SMILES")
-        output_column = _get_arg_or_config(args, config, "output_column", "SMILES_std")
-        reason_column = _get_arg_or_config(args, config, "reason_column", "SMILES_std_reason")
+        output_column = _get_arg_or_config(args, config, "output_column", "SMILES_standardized")
+        reason_column = _get_arg_or_config(args, config, "reason_column", "preprocess_reason")
 
         keep_isomeric = _resolve_bool_arg(args, config, "keep_isomeric", "keep_isomeric", True)
         canonical_tautomer = _resolve_bool_arg(args, config, "canonical_tautomer", "canonical_tautomer", True)
@@ -288,9 +442,8 @@ def main() -> None:
             raise ValueError("input and output must be provided via CLI or YAML config")
 
         df = pd.read_csv(input_path)
-
         df_out = preprocess_smiles_dataframe(
-            df=df,
+            df,
             smiles_column=smiles_column,
             output_column=output_column,
             reason_column=reason_column,
@@ -351,6 +504,136 @@ def main() -> None:
         )
         _ensure_parent_dir(output_path)
         df_out.to_csv(output_path, index=False)
+
+    elif args.command == "model-crossvalidation":
+        full_config = _load_yaml_config(args.config) if args.config else {}
+        config = _get_command_config(full_config, args.command)
+
+        input_path = _get_arg_or_config(args, config, "input")
+        output_dir = config.get("output_dir", "cv_outputs")
+        smiles_column = config.get("smiles_column", "SMILES_standardized")
+        target_column = config.get("target_column")
+        row_id_column = config.get("row_id_column")
+
+        if input_path is None or target_column is None:
+            raise ValueError("input and target_column must be provided in YAML config")
+
+        models = config.get("models", ["rf"])
+        if isinstance(models, str):
+            models = _parse_csv_list(models)
+
+        feature_sets = config.get("feature_sets", [config.get("feature_set", "morgan")])
+        if isinstance(feature_sets, str):
+            base_feature_sets = _parse_csv_list(feature_sets)
+        elif isinstance(feature_sets, list):
+            base_feature_sets = [str(x).strip() for x in feature_sets if str(x).strip()]
+        else:
+            raise ValueError("feature_sets in config must be a list or comma-separated string")
+
+        metrics = config.get("metrics", ["rmse", "mae", "r2"])
+        if isinstance(metrics, str):
+            metrics = _parse_csv_list(metrics)
+
+        morgan_radius = _ensure_int_list(config.get("morgan_radius"), [3])
+        morgan_bits = _ensure_int_list(config.get("morgan_bits"), [1024])
+        avalon_bits = _ensure_int_list(config.get("avalon_bits"), [1024])
+        rdkit_path_min = _ensure_int_list(config.get("rdkit_path_min"), [1])
+        rdkit_path_max = _ensure_int_list(config.get("rdkit_path_max"), [7])
+        rdkit_path_bits = _ensure_int_list(config.get("rdkit_path_bits"), [1024])
+
+        expanded_feature_sets = _expand_cv_feature_sets(
+            base_feature_sets,
+            morgan_radius=morgan_radius,
+            morgan_bits=morgan_bits,
+            avalon_bits=avalon_bits,
+            rdkit_path_min=rdkit_path_min,
+            rdkit_path_max=rdkit_path_max,
+            rdkit_path_bits=rdkit_path_bits,
+        )
+
+        split_raw = config.get("split", {})
+        split_cfg = SplitConfig(
+            method=split_raw.get("method", "random"),
+            outer_folds=int(split_raw.get("outer_folds", 5)),
+            inner_folds=int(split_raw.get("inner_folds", 5)),
+            shuffle=bool(split_raw.get("shuffle", True)),
+            random_state=int(split_raw.get("random_state", config.get("random_state", 0))),
+            group_column=split_raw.get("group_column"),
+            time_column=split_raw.get("time_column"),
+            time_ascending=bool(split_raw.get("time_ascending", True)),
+            scaffold_include_chirality=bool(split_raw.get("scaffold_include_chirality", False)),
+        )
+
+        feature_raw = config.get("features", {})
+        feature_cfg = FeatureConfig(
+            feature_set=expanded_feature_sets[0] if expanded_feature_sets else "morgan_r3_b1024",
+            mordred_max_nan_frac=float(feature_raw.get("mordred_max_nan_frac", 0.2)),
+            mordred_drop_constant=bool(feature_raw.get("mordred_drop_constant", True)),
+        )
+
+        optimization_raw = config.get("optimization", {})
+        optimization_cfg = OptimizationConfig(
+            enabled=bool(optimization_raw.get("enabled", False)),
+            metric=optimization_raw.get("metric", config.get("primary_metric", "rmse")),
+            n_trials=int(optimization_raw.get("n_trials", 30)),
+            timeout_s=optimization_raw.get("timeout_s"),
+            random_state=int(optimization_raw.get("random_state", config.get("random_state", 0))),
+        )
+
+        run_cfg = RunConfig(
+            input_path=input_path,
+            output_dir=output_dir,
+            smiles_column=smiles_column,
+            target_column=target_column,
+            metrics=tuple(metrics),
+            primary_metric=config.get("primary_metric", "rmse"),
+            models=tuple(models),
+            feature_sets=tuple(expanded_feature_sets),
+            split=split_cfg,
+            feature_params=feature_cfg,
+            optimization=optimization_cfg,
+            dropna_target=bool(config.get("dropna_target", True)),
+            dropna_smiles=bool(config.get("dropna_smiles", True)),
+            row_id_column=row_id_column,
+            refit_best_model=bool(config.get("refit_best_model", True)),
+            refit_validation_fraction=float(config.get("refit_validation_fraction", 0.1)),
+            save_fold_predictions=bool(config.get("save_fold_predictions", True)),
+            save_best_params=bool(config.get("save_best_params", True)),
+            random_state=int(config.get("random_state", 0)),
+            n_jobs=int(config.get("n_jobs", -1)),
+            model_params=config.get("model_params", {}),
+        )
+
+        _, df_summary, artifact = run_nested_cross_validation(run_cfg)
+        print(df_summary.to_string(index=False))
+        best_row = artifact["best_row"]
+        print(f"best_model={best_row['model']}")
+        print(f"best_feature_set={best_row['feature_set']}")
+        print(f"primary_metric={run_cfg.primary_metric}")
+        print(f"best_score={best_row[f'{run_cfg.primary_metric}_mean']}")
+
+    elif args.command == "predict-model":
+        full_config = _load_yaml_config(args.config) if args.config else {}
+        config = _get_command_config(full_config, args.command)
+
+        input_path = _get_arg_or_config(args, config, "input")
+        refit_dir = _get_arg_or_config(args, config, "refit_dir")
+        output_path = _get_arg_or_config(args, config, "output")
+        smiles_column = _get_arg_or_config(args, config, "smiles_column", "SMILES_standardized")
+        prediction_column = _get_arg_or_config(args, config, "prediction_column", "prediction")
+
+        if input_path is None or refit_dir is None or output_path is None:
+            raise ValueError("input, refit_dir and output must be provided via CLI or YAML config")
+
+        df_pred = predict_from_refit(
+            input_path=input_path,
+            refit_dir=refit_dir,
+            output_path=output_path,
+            smiles_column=smiles_column,
+            prediction_column=prediction_column,
+        )
+        print(f"wrote_predictions={output_path}")
+        print(f"n_rows={len(df_pred)}")
 
     elif args.command == "applicability-domain":
         full_config = _load_yaml_config(args.config) if args.config else {}
