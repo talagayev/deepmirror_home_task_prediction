@@ -72,4 +72,14 @@ I used Autogluon and Chemprop for model Crossvalidation/Training and building.
 
 I was able to run Autogluon with the ExpansionRx dataset for all features, while for the remainder I focused on Chemeleon, due to me requiring to do crossvalidation only for chemeleon itself, while for the FPs, I would need to test out the most preferable combination with Chemprop taking too long on my PC and thus I was able to get the final predictions for the `No Scale` and `All` datasets for Chemprop on the final day with only some hours left before the deadline.
 
-As for the Crossvalidation. A nested 5x5 CV was performed with 10 trials and 100 max epochs. [Here is one yml containing more details](https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Crossvalidation/expansion/crossvalidation_expansion_chemprop.yml)
+For the CV a 5x5 nested CV was used. The primary metric for model performance was MAE. Due to the previously mentioned fact that in this approach `log1p` values were used the MAE values in the CV were higher then in the final evalutaion, where they were converted to `log10` values to recreate the OpenADMET model performance evaluation.
+
+For the Autogluon prediction the `best_quality` setting was used with `time_limit = 600s`. [Here is an example yaml file used](https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Crossvalidation/expansion/crossvalidation_expansion.yml)
+
+For Chemprop nested 5x5 CV was performed with 10 trials and 100 max epochs. [Here is one yml containing more details](https://github.com/talagayev/deepmirror_home_task_prediction/blob/main/OpenADMET_Data_Workflow/Crossvalidation/expansion/crossvalidation_expansion_chemprop.yml)
+
+After the CV the best performing model was obtained after refitting.
+
+## Prediction & Evaluation
+
+The models were used for predicting the test set and finally evaluated using the [evaluation metrics provided by OpenADMET](https://github.com/OpenADMET/ExpansionRx-Challenge-Tutorial/blob/main/eval/eval.py)
