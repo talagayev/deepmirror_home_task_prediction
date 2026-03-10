@@ -4,3 +4,4 @@ The task for deepmirror consisted in the building a workflow that would predict 
 
 One of the main benchmarks would consist in predicting the test set presented in the [OpenADMET ExpansionRx ADMET Challenge](https://huggingface.co/spaces/openadmet/OpenADMET-ExpansionRx-Challenge)
 
+A full detailed report can be found at: [Report.md](Report.md)
