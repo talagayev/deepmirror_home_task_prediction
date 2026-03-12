@@ -1,0 +1,91 @@
+model-crossvalidation:
+  input: ../../Deduplication/Training/no_chembl/deduplicated/all_data_no_chembl_deduplicated_new_log10_high.csv
+  output_dir: chemprop_no_chembl_hlm_crossvalidation_log10_high
+
+  smiles_column: SMILES_standardized
+  target_column: hlm_value_scaled_log10_high_deduplicated
+  row_id_column: mol_id
+
+  dropna_smiles: true
+  dropna_target: true
+
+  models:
+    - chemprop
+
+  feature_sets:
+    - chemeleon
+
+
+  morgan_radius:
+    - 2
+    - 3
+
+  morgan_bits:
+    - 512
+    - 1024
+    - 2048
+
+  avalon_bits:
+    - 1024
+
+  rdkit_path_min:
+    - 3
+
+  rdkit_path_max:
+    - 6
+    - 7
+    - 8
+
+  rdkit_path_bits:
+    - 1024
+
+  features:
+    mordred_max_nan_frac: 0.2
+    mordred_drop_constant: true
+
+  metrics:
+    - rmse
+    - mae
+    - r2
+    - spearman_rho
+
+  primary_metric: mae
+
+  split:
+    method: scaffold
+    outer_folds: 5
+    inner_folds: 5
+    shuffle: true
+    random_state: 42
+    scaffold_include_chirality: false
+
+  optimization:
+    enabled: true
+    metric: mae
+    n_trials: 10
+    random_state: 42
+
+  refit_best_model: true
+  refit_validation_fraction: 0.1
+  save_fold_predictions: true
+  save_best_params: true
+  random_state: 42
+  n_jobs: -1
+
+  model_params:
+    rf: {}
+
+    svm: {}
+
+    autogluon:
+      presets: best_quality
+      time_limit_s: 600
+
+    chemprop:
+      max_epochs: 100
+      early_stopping: true
+      early_stopping_patience: 10
+      batch_size: 1024
+      enable_progress_bar: false
+      accelerator: auto
+      devices: 1
