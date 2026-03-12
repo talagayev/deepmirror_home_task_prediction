@@ -1,0 +1,6 @@
+predict-model:
+  input: ../Preprocessing/Test/preprocessed/expansion_data_test_adjusted_preprocessed.csv
+  refit_dir: ../Crossvalidation/no_scale/chemprop_no_scaling_hlm_crossvalidation_log1p_chemeleon_best/refit
+  output: outputs/no_scale_chemprop_log10.csv
+  smiles_column: SMILES_standardized
+  prediction_column: y_pred_log10
