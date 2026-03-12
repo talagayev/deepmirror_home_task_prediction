@@ -1,0 +1,5 @@
+TARGETS = {
+    "CHEMBL375": "Mus musculus",
+    "CHEMBL612558": "ADMET",
+    "CHEMBL613580": "Liver",
+}

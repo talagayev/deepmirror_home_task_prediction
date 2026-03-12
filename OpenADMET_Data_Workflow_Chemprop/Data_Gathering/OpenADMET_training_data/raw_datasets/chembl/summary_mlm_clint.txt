@@ -1,0 +1,7 @@
+Input file: raw_datasets/chembl/chembl_mlm_cl.csv
+Total rows processed: 6177
+
+chembl_mlm_intrinsic: 4897
+chembl_mlm_unbound: 190
+chembl_mlm_hepatic: 137
+chembl_mlm_unknown: 953
