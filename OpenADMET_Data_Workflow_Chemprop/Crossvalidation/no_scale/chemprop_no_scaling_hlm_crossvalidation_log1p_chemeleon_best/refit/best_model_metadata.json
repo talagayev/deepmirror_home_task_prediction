@@ -1,0 +1,51 @@
+{
+  "model": "chemprop",
+  "feature_set": "chemeleon",
+  "primary_metric": "mae",
+  "summary_row": {
+    "model": "chemprop",
+    "feature_set": "chemeleon",
+    "rmse_mean": 0.4529644591089121,
+    "rmse_std": 0.013054468716132231,
+    "mae_mean": 0.3427805083068375,
+    "mae_std": 0.012612580940066289,
+    "r2_mean": 0.5224981372702567,
+    "r2_std": 0.019814234231470784,
+    "spearman_rho_mean": 0.7245277840154574,
+    "spearman_rho_std": 0.017611730186401116
+  },
+  "best_params": {
+    "cfg": {
+      "message_hidden_dim": 300,
+      "message_depth": 3,
+      "message_dropout": 0.0,
+      "ffn_hidden_dim": 300,
+      "ffn_layers": 3,
+      "ffn_dropout": 0.23915999152443407,
+      "ffn_activation": "relu",
+      "batch_norm": true,
+      "warmup_epochs": 1,
+      "init_lr": 1.193547774248138e-05,
+      "max_lr": 0.0010575486010842795,
+      "final_lr": 4.574578205475403e-05,
+      "max_epochs": 100,
+      "batch_size": 64,
+      "num_workers": 0,
+      "accelerator": "auto",
+      "devices": 1,
+      "enable_progress_bar": false,
+      "early_stopping": true,
+      "early_stopping_patience": 10,
+      "early_stopping_min_delta": 0.0,
+      "checkpoint_dir": "chemprop_no_scaling_hlm_crossvalidation_log1p_chemeleon_best/refit/chemprop_checkpoint",
+      "checkpoint_monitor": "val_loss",
+      "checkpoint_mode": "min",
+      "from_foundation": "chemeleon",
+      "foundation_ckpt_path": null,
+      "foundation_ckpt_url": "https://zenodo.org/records/15460715/files/chemeleon_mp.pt",
+      "extra_descriptor_tokens": [],
+      "mordred_max_nan_frac": 0.2,
+      "mordred_drop_constant": true
+    }
+  }
+}
