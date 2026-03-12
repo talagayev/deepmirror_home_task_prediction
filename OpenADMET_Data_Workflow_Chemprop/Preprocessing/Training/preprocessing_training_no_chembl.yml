@@ -1,0 +1,7 @@
+input: ../../Data_Gathering/OpenADMET_training_data/combined_datasets/all_data_no_chembl.csv
+output: ./preprocessed/all_data_no_chembl_preprocessed_new.csv
+smiles_column: SMILES
+output_column: SMILES_standardized
+keep_isomeric: true
+protonate: true
+ph: 7.4
