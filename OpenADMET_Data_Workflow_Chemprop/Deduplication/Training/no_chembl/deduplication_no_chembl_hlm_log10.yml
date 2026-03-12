@@ -1,0 +1,11 @@
+deduplicate:
+  input: ../../../Preprocessing/Training/preprocessed/all_data_no_chembl_preprocessed_new.csv
+  output: ./deduplicated/all_data_no_chembl_deduplicated_new_log10_high.csv
+  key_cols:
+    - SMILES_standardized
+  keep_cols:
+    - SMILES
+    - mol_id
+    - dataset
+  target_col: hlm_value_scaled_log10_high
+  method: mean
